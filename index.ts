@@ -18,10 +18,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-app.get('/', (req, res) => {
-    res.send('Hello, World!');
-});
-
 app.use('/categories', categoriesRouter);
 app.use('/sites', sitesRouter);
 app.use('/images', imagesRouter);
