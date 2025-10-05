@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { getFullImage, getImageCardData, getImagesByCategory, getJamesWebbImages, uploadImage } from "../controllers/images.controller.js";
+import { getFullImage, getImageCardData, getImagesByCategory, getJamesWebbImages, getPromptImages, uploadImage } from "../controllers/images.controller.js";
 
 const router = Router();
 
@@ -21,6 +21,10 @@ router.get("/images/james_webb", (req: Request, res: Response) => {
 
 router.post("/", (req: Request, res: Response) => {
     uploadImage(req, res);
+});
+
+router.get("/images/ai", (req: Request, res: Response) => {
+    getPromptImages(req, res);
 });
 
 export default router;

@@ -1,3 +1,4 @@
+import { OpenAI } from "openai";
 import sharp from "sharp";
 import path from "path";
 import fs from "fs-extra";
@@ -238,3 +239,80 @@ export async function getJamesWebbImages(req: Request, res: Response) {
         return res.status(500).json({ error: "Internal server error" });
     }
 }
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function getPromptEmbedding(prompt: string) {
+    const response = await openai.embeddings.create({
+        model: "text-embedding-3-large",
+        input: prompt,
+    });
+
+    return response?.data[0]?.embedding;
+}
+
+function parseEmbedding(text: string): number[] {
+    return text.split(",").map(Number);
+}
+
+function cosineSimilarity(vecA: number[], vecB: number[]) {
+    const dot = vecA.reduce((sum, a, i) => sum + a * (vecB[i] ?? 0), 0);
+    const magA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
+    const magB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
+    return dot / (magA * magB);
+}
+
+export async function getPromptImages(req: Request, res: Response) {
+    try {
+        const userPrompt = req.query.prompt as string;
+        if (!userPrompt) return res.status(400).json({ error: "Prompt is required" });
+
+        const promptEmbedding = await getPromptEmbedding(userPrompt);
+
+        const images = await prisma.image.findMany({
+            select: {
+                imageId: true,
+                title: true,
+                previewImageUrl: true,
+                aiDescription: true,
+            },
+            take: 500,
+        });
+
+        // 3️⃣ Calcular similitud
+        const scoredImages = images.map(img => {
+            if (!img.aiDescription) return { ...img, similarity: -1 }; // Manejar caso sin embedding
+            if (!promptEmbedding) return { ...img, similarity: -1 }; // Manejar caso sin embedding de prompt
+            const imageEmbedding = parseEmbedding(img.aiDescription);
+            const similarity = cosineSimilarity(promptEmbedding, imageEmbedding);
+            console.log(`Similitud para imagen ${img.imageId}: ${similarity}`);
+            return { ...img, similarity };
+        });
+
+        // 4️⃣ Ordenar por similitud descendente y tomar solo aquellas con una simulitud positiva
+        const positiveImages = scoredImages.filter(img => img.similarity > 0.5);
+        const topImages = positiveImages
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, 15);
+
+        // 5️⃣ Convertir a base64
+        const imagesWithBase64 = await Promise.all(
+            topImages.map(async (img) => {
+                const base64 = await parseToBase64(img.previewImageUrl);
+                return {
+                    imageId: img.imageId,
+                    title: img.title,
+                    base64,
+                    similarity: img.similarity,
+                };
+            })
+        );
+
+        return res.status(200).json(imagesWithBase64);
+
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+}
+
