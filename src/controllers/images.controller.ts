@@ -285,12 +285,11 @@ export async function getPromptImages(req: Request, res: Response) {
             if (!promptEmbedding) return { ...img, similarity: -1 }; // Manejar caso sin embedding de prompt
             const imageEmbedding = parseEmbedding(img.aiDescription);
             const similarity = cosineSimilarity(promptEmbedding, imageEmbedding);
-            console.log(`Similitud para imagen ${img.imageId}: ${similarity}`);
             return { ...img, similarity };
         });
 
         // 4️⃣ Ordenar por similitud descendente y tomar solo aquellas con una simulitud positiva
-        const positiveImages = scoredImages.filter(img => img.similarity > 0.5);
+        const positiveImages = scoredImages.filter(img => img.similarity > 0.4);
         const topImages = positiveImages
             .sort((a, b) => b.similarity - a.similarity)
             .slice(0, 15);
