@@ -201,3 +201,40 @@ export async function uploadImage(req: Request, res: Response) {
     }
 
 }
+
+export async function getJamesWebbImages(req: Request, res: Response) {
+    try {
+        const images = await prisma.image.findMany({
+            select: {
+                imageId: true,
+                title: true,
+                previewImageUrl: true,
+                category: {
+                    select: {
+                        name: true,
+                    },
+                },
+            },
+            where: { categoryId: 11 }, // Assuming categoryId 3 corresponds to James Webb images
+            take: 15,
+        });
+
+        if (images.length === 0) return res.status(404).json({ error: "No images found" });
+
+        const imagesWithBase64 = await Promise.all(
+            images.map(async (img) => {
+                const base64 = await parseToBase64(img.previewImageUrl);
+                return {
+                    imageId: img.imageId,
+                    title: img.title,
+                    base64,
+                };
+            })
+        );
+
+        return res.status(200).json(imagesWithBase64);
+    } catch (error) {
+        console.log(error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+}
